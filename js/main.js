@@ -162,17 +162,24 @@ cxlm.toggleToGame = async function (missionName) {
     cxlm.initLeaderMetaData(), // 加载领主元数据
     cxlm.initFragMetaData(), // 加载其他必要碎片
   ]);
-  cxlm.groups = {
+  cxlm.groups = { // TODO: 制作存档时保留
     blue: {}, // leader
     red: {}, // units
     green: {}, // money
     dark: {}, // population
     purple: {}, // active
     yellow: {},
+    units: [], // 存放所有单元的二维矩阵
     population: 50,
     turns: 0,
     order: ['blue', 'red', 'green', 'dark', 'purple', 'yellow'],
   };
+  cxlm.clickMQ = new cxlm.MessageQueue();
+  cxlm.clickMQ.subscribe('inner', 10).autoControl(msg => {
+    cxlm.cursorX = msg.x;
+    cxlm.cursorY = msg.y;
+    console.log(msg);
+  })
   cxlm.toggleLoading('hide');
   // 开始绘制游戏画面
   cxlm.startGame();
@@ -268,7 +275,9 @@ cxlm.drawMap = function () {
   }
 }
 
-/** 绘制单元 */
+/** 绘制单元
+ * TODO: 单元状态
+ */
 cxlm.drawUnits = function () {
   cxlm.groups.order.forEach(async color => {
     let nowGroup = cxlm.groups[color];
@@ -283,6 +292,44 @@ cxlm.drawUnits = function () {
   });
 }
 
+/** 绘制光标 */
+cxlm.drawCursor = function () {
+  let step = ((cxlm.clock / 30) & 1) + 1;
+  let cursorMeta = cxlm.fragments['cube' + step];
+  let mapItemWid = cxlm.options.mapMeta.itemWidth * cxlm.options.scale;
+  let mapItemHei = cxlm.options.mapMeta.itemHeight * cxlm.options.scale;
+  let targetX = cxlm.offsetX + cxlm.cursorX * mapItemWid + cxlm.dragOffsetX;
+  let targetY = cxlm.offsetY + cxlm.cursorY * mapItemHei + cxlm.dragOffsetY;
+  targetX -= (cursorMeta.width * cxlm.options.scale - mapItemWid) >> 1;
+  targetY -= (cursorMeta.height * cxlm.options.scale - mapItemHei) >> 1;
+  cxlm.ctx.drawImage(cxlm.fragImg, cursorMeta.x, cursorMeta.y,
+    cursorMeta.width, cursorMeta.height, targetX, targetY,
+    cursorMeta.width * cxlm.options.scale, cursorMeta.height * cxlm.options.scale);
+}
+
+/**
+ * 显示剧情，mode 指定显示或隐藏
+ * @param {string} mode 合法值：show, hide
+ * @param {string} color 角色名
+ * @param {string} text 剧情文字
+ */
+cxlm.story = function (mode, color, text) {
+  let jqDom = $('#story-area');
+  if (mode === 'hide') {
+    jqDom[0].style.setProperty('display', 'none');
+    return;
+  } else if (!cxlm.leaders) {
+    console.error('数据未加载，必须确保游戏数据加载完成后调用本方法');
+  } else {
+    jqDom[0].style.setProperty('display', '');
+    let storyRole = $('#story-role');
+    storyRole[0].style.setProperty('background-position', cxlm.leaders['leader_' + color].big.x + 'px -' + cxlm.leaders['leader_' + color].big.y + 'px');
+    storyRole.width(cxlm.leaders['leader_' + color].big.width);
+    storyRole.height(cxlm.leaders['leader_' + color].big.height);
+    $('#story-text').text(text);
+  }
+}
+
 /**
  * 启动绘制逻辑
  */
@@ -290,6 +337,14 @@ cxlm.startGame = function () {
   // 地图行列数
   let mapRows = cxlm.map.length;
   let mapCols = cxlm.map[0].length;
+  cxlm.mapRows = mapRows;
+  cxlm.mapCols = mapRows;
+  for (let i = 0; i < mapRows; i++) {
+    cxlm.groups.units[i] = [];
+  }
+  // 初始化光标位置
+  cxlm.cursorX = mapRows >> 1;
+  cxlm.cursorY = mapCols >> 1;
   // 可绘制区域宽高
   let drawWidth = mapCols * cxlm.options.mapMeta.itemWidth * cxlm.options.scale;
   let drawHeight = mapRows * cxlm.options.mapMeta.itemHeight * cxlm.options.scale;
@@ -300,7 +355,7 @@ cxlm.startGame = function () {
   // 启用监听函数
   cxlm.canvas.on('click', event => {
     if (cxlm.dragStartX !== event.offsetX || cxlm.dragStartY !== event.offsetY) return; // 拖拽事件
-    console.log('click', event.offsetX, event.offsetY);
+    cxlm.clickMQ.offer(new cxlm.ClickMessage(event.offsetX, event.offsetY)); // 交由消息队列进行分发
   });
   // 监听拖拽
   cxlm.dragOffsetX = cxlm.dragOffsetY = 0;
@@ -356,8 +411,15 @@ cxlm.startGame = function () {
       }
       toGroup.units.push(role);
     }
+    cxlm.groups.units[role.x][role.y] = role;
   })
   cxlm.clock = 0; // 绘图时钟
+  // TODO: 拓展存档加载功能
+  // 获取剧情
+  if (!cxlm.storyIndex) { // 没有获取到存档，重新开始
+    cxlm.storyIndex = 0; // TODO 存档时保留
+    cxlm.storyShowing = false;
+  }
   // 启动主循环
   let loop = function () {
     if (cxlm.mainLoopStarted) {
@@ -366,6 +428,10 @@ cxlm.startGame = function () {
       if (cxlm.clock >= 1024) cxlm.clock = 0;
       cxlm.drawMap();
       cxlm.drawUnits();
+      cxlm.drawCursor(); // 绘制光标
+      if (!cxlm.storyShowing && cxlm.storyLine.length > cxlm.storyIndex && cxlm.storyLine[cxlm.storyIndex].startCondition()) {
+
+      }
       // TODO: 绘制其他元素
     }
   }

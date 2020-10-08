@@ -429,8 +429,8 @@ cxlm.Role = class {
     } else {
       let imgData = cxlm.unitParts[this.unit + nowStep];
       let unitMeta = cxlm.options.unitMeta;
-      offsetX = cxlm.offsetX + this.x * scaledWidth + scaledWidth - cxlm.options.unitMeta.itemWidth * scale;
-      offsetY = cxlm.offsetY + this.y * scaledHeight + scaledHeight - cxlm.options.unitMeta.itemHeight * scale;
+      offsetX = cxlm.offsetX + this.x * scaledWidth + scaledWidth - cxlm.options.unitMeta.itemWidth * scale + cxlm.dragOffsetX;
+      offsetY = cxlm.offsetY + this.y * scaledHeight + scaledHeight - cxlm.options.unitMeta.itemHeight * scale + cxlm.dragOffsetY;
       if (this.color === 'blue') {
         cxlm.ctx.drawImage(cxlm.unitImg, imgData.x, imgData.y, unitMeta.itemWidth, unitMeta.itemHeight,
           offsetX, offsetY, unitMeta.itemWidth * scale, unitMeta.itemHeight * scale);
@@ -723,7 +723,6 @@ cxlm.initLeaderMetaData = function () {
       res();
     }
   })
-
 }
 
 /**
@@ -733,10 +732,12 @@ cxlm.initFragMetaData = function () {
   if (cxlm.fragMetaLoaded) return Promise.resolve();
 
   let rect = (x, y, width, height) => {
-    x,
-    y,
-    width,
-    height
+    return {
+      x,
+      y,
+      width,
+      height
+    }
   };
 
   cxlm.fragments = {
@@ -777,6 +778,207 @@ cxlm.initFragMetaData = function () {
     }
   });
 }
+
+// ---------------------------------
+//      消息队列，发布订阅模型
+// ---------------------------------
+
+// 订阅者
+cxlm.Subscriber = class {
+  static allSubs = {};
+  constructor(topic, priority, mq) {
+    this.topic = topic;
+    this.priority = priority;
+    this.mq = mq;
+    this.key = Symbol(topic);
+  }
+  // 请求一条消息
+  acquire() {
+    let that = this;
+    return new Promise(function (res) {
+      that.mq.consume(that, res);
+    })
+  }
+
+  // 取消订阅，释放内存
+  unsubscribe() {
+    delete allSubs[key];
+  }
+
+  // 自动控制
+  async autoControl(fn) {
+    while (1) {
+      await this.acquire().then(msg => fn(msg));
+    }
+  }
+
+}
+
+// 画布点击事件
+cxlm.ClickMessage = class {
+  constructor(x, y) {
+    let itemWidth = cxlm.options.mapMeta.itemWidth * cxlm.options.scale;
+    let itemHeight = cxlm.options.mapMeta.itemHeight * cxlm.options.scale;
+    if (x < cxlm.offsetX || y < cxlm.offsetY || x > cxlm.offsetX + cxlm.mapCols * cxlm.options.mapMeta.itemWidth * cxlm.options.scale ||
+      y > cxlm.offsetY + cxlm.mapRows * cxlm.options.mapMeta.itemHeight * cxlm.options.scale) {
+      this.topic = '*';
+    } else {
+      this.topic = 'inner';
+    }
+    this.x = ~~((x - cxlm.offsetX) / itemWidth);
+    this.y = ~~((y - cxlm.offsetY) / itemHeight);
+  }
+}
+
+// 消息队列
+cxlm.MessageQueue = class {
+  dispacherWorking = false;
+  nodeCompFunc = (a, b) => b.priority - a.priority;
+  constructor() {
+    this.messageQueue = [];
+    this.blockingQueues = {};
+    this.blockingQueues['*'] = new cxlm.PriorityQueue(this.nodeCompFunc);
+  }
+
+  // 对队列中的消息进行分发
+  _dispatch() {
+    this.dispacherWorking = true;
+    while (this.messageQueue.length !== 0) {
+      let nowMsg = this.messageQueue[0];
+      let targetQueue = this.blockingQueues[nowMsg.topic];
+      this.messageQueue.shift(); // 清除读取的消息
+      if (nowMsg.topic !== '*' && !this.blockingQueues['*'].isEmpty() && this.blockingQueues['*'].peak().priority > targetQueue.peak().priority) {
+        targetQueue = this.blockingQueues['*'];
+      }
+      if (targetQueue.length === 0) continue; // 消息积压时，直接丢弃消息，可以在这里添加其他处理方案
+      let receiver = targetQueue.shift();
+      receiver.res(nowMsg);
+    }
+    this.dispacherWorking = false;
+  }
+
+  /**
+   * 生成订阅者
+   * @param {string} topic 消息分类
+   * @param {number} priority 当前订阅者在所属消息分类内的优先级
+   * @returns {cxlm.Subscriber} 订阅者对象
+   */
+  subscribe(topic, priority) {
+    let now = new cxlm.Subscriber(topic, priority, this);
+    if (!this.blockingQueues[topic]) {
+      this.newType(topic);
+    }
+    cxlm.Subscriber.allSubs[now.key] = now;
+    return now;
+  }
+
+  /**
+   * 创建阻塞队列
+   * @param {string} topic 订阅主题
+   */
+  newType(topic) {
+    if (!this.blockingQueues[topic]) {
+      this.blockingQueues[topic] = new cxlm.PriorityQueue(this.nodeCompFunc);
+    }
+  }
+
+  // 生产消息
+  offer(msg) {
+    this.messageQueue.push(msg);
+    if (this.dispacherWorking) return;
+    this._dispatch();
+  }
+
+  // 不应该手动调用，只应该由订阅者进行调用
+  consume(sub, res) {
+    this.blockingQueues[sub.topic].offer(new cxlm.BlockNode(sub.priority, res));
+    if (this.messageQueue.length !== 0 && !this.dispacherWorking) {
+      this._dispatch();
+    }
+  }
+
+}
+
+// 放在阻塞队列中的节点
+cxlm.BlockNode = class {
+  constructor(priority, res) {
+    this.priority = priority;
+    this.res = res;
+  }
+}
+
+// 优先级队列
+cxlm.PriorityQueue = class PriorityQueue {
+  constructor(cmpFn = (a, b) => a - b) {
+    this._cmp = cmpFn;
+    this.length = 0;
+    this._queue = [];
+  };
+  _swap(i, j) {
+    let temp = this._queue[j];
+    this._queue[j] = this._queue[i];
+    this._queue[i] = temp;
+  }
+  _nodeUp(i) {
+    while (i !== 0) {
+      let root = (i - 1) >> 1;
+      if (this._cmp(this._queue[root], this._queue[i]) >= 0) return;
+      this._swap(root, i);
+      i = root;
+    }
+  };
+  _nodeDown(i) {
+    while (i <= (this.length - 1) >> 1) {
+      let l = (i << 1) + 1,
+        r = l + 1;
+      if (l + 1 < this.length) {
+        // 包含两个子节点且
+        if (this._cmp(this._queue[i], this._queue[l]) <= 0 && this._cmp(this._queue[i], this._queue[r]) <= 0) {
+          // 比两个子节点都小，与较大的节点替换
+          l = this._cmp(this._queue[l], this._queue[r]) >= 0 ? l : r;
+          this._swap(l, i);
+          i = l;
+        } else if (this._cmp(this._queue[i], this._queue[l]) <= 0) {
+          // 比左节点小
+          this._swap(l, i);
+          i = l;
+        } else if (this._cmp(this._queue[i], this._queue[r]) <= 0) {
+          // 比右节点小
+          this._swap(r, i);
+          i = r;
+        } else {
+          // 比两节点都大，结束
+          break;
+        }
+      } else if (this._cmp(this._queue[i], this._queue[l]) <= 0) {
+        // 只有左节点，且比左节点小
+        this._swap(l, i);
+        i = l;
+      } else {
+        // 退出：比仅有的左节点大
+        break;
+      }
+    }
+  };
+  offer(ele) {
+    this._queue[this.length] = ele;
+    this._nodeUp(this.length++);
+  };
+  peak() {
+    return this._queue[0];
+  };
+  shift() {
+    let res = this._queue[0];
+    this._queue[0] = this._queue[--this.length];
+    this._nodeDown(0);
+    return res;
+  }
+  isEmpty() {
+    return this.length === 0;
+  }
+}
+
+// -- END：消息队列
 
 /**
  * 创建 DOM 节点

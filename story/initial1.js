@@ -22,26 +22,24 @@ cxlm.loadGame = function () {
    * 地图，必须
    */
   cxlm.map = [
-    ['w_p2', 'w_srd', 'l_pen', 'l_castle_grey', 'w_sdl', 'w_p3'],
-    ['w_sr', 'l_town_blue', 'l_tree2', 'l_tree3', 'l_castle_blue', 'w_sl'],
-    ['l_town_red', 'l_tree2', 'l_town_purple', 'l_town_dark', 'l_town_yellow', 'w_sl'],
-    ['w_sr', 'l_town_purple', 'l_tree2', 'l_town_grey', 'l_tree2', 'w_sl'],
-    ['l_castle_red', 'l_tree2', 'l_castle_purple', 'l_castle_dark', 'l_castle_yellow', 'w_sl'],
-    ['w_p1', 'w_sur', 'l_castle_green', 'l_temple', 'w_sul', 'w_p0'],
+    ['w_p2', 'w_sd', 'w_sd', 'w_sd', 'w_sd', 'w_sd', 'w_p3'],
+    ['w_sr', 'l_castle_grey', 'l_tree3', 'l_hill', 'l_tree3', 'l_tree2', 'w_sl'],
+    ['w_sr', 'l_tree3', 'w_surdl', 'l_tree3', 'w_surdl', 'l_tree3', 'w_sl'],
+    ['w_sr', 'l_hill', 'l_tree3', 'l_temple', 'l_tree3', 'l_hill', 'w_sl'],
+    ['w_sr', 'l_tree2', 'w_surdl', 'l_tree2', 'w_surdl', 'l_tree2', 'w_sl'],
+    ['w_sr', 'l_tree2', 'l_tree3', 'l_hill', 'l_tree3', 'l_town_blue', 'w_sl'],
+    ['w_p1', 'w_su', 'w_su', 'w_su', 'w_su', 'w_su', 'w_p0'],
   ];
 
   /**
    * 初始角色位置，坐标从零开始
    */
   cxlm.initRoles = [
-    ['blue_leader', 0, 3],
-    ['red_leader', 1, 1],
-    ['green_ghost', 2, 1],
-    ['yellow_wolf', 2, 2],
-    ['purple_archer', 3, 3],
-    ['dark_soldier', 0, 0],
-    ['red_wolfarcher', 0, 1],
-    ['blue_dragon', 0, 2],
+    ['blue_leader', 5, 5],
+    ['red_soldier', 5, 4],
+    ['red_soldier', 5, 6],
+    ['red_soldier', 4, 5],
+    ['red_soldier', 6, 5],
   ]
 
   /**
@@ -54,11 +52,15 @@ cxlm.loadGame = function () {
       ['blue', '对，俺被包围了，点击俺可以选择行动，别让俺挂了'],
       ['blue', '什么？怎么移动？怎么攻击？不知道！']
     ],
-    effect: () => {},
+    effect: () => {
+      // 光标定位到蓝色领主
+      cxlm.clickX = 5;
+      cxlm.clickY = 5;
+    },
   }, {
     startCondition: () => {},
     text: [
-      ['blue', '完事了？嗯嗯，还行。'],
+      ['blue', '行了行了，先这样吧'],
       ['blue', '去把那个城堡占领了，占领它就可以招募军队了'],
       ['blue', '没钱？你占领的城堡和村庄都会交税，可别问俺要，俺没有！']
     ],
