@@ -1,0 +1,151 @@
+html,
+body {
+  overflow: hidden;
+}
+
+#bg-img {
+  /* 背景图设定 */
+  background-image: url(../img/bg.jpg);
+  background-color: black;
+  background-repeat: no-repeat;
+  background-position: center 0;
+  background-size: cover;
+  position: absolute;
+  top: 0%;
+  left: 0%;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+.start-menu-container {
+  position: relative;
+  text-align: center;
+  padding-top: 30%;
+}
+
+.start-btn {
+  /* 主按钮 */
+  font-size: 1.5em;
+  color: rgba(255, 255, 255, 0.8);
+  text-align: center;
+  padding: 0.5em 1em;
+  display: inline-block;
+  background-color: rgba(0, 0, 0, 0.6);
+  margin: 4pt;
+  border: 5px double rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+}
+
+.start-btn:hover {
+  /* 主按钮 */
+  background-color: rgba(0, 0, 0, 1);
+  transform: scale(1.2, 1.2);
+  animation: sctool .5s;
+  -moz-animation: sctool .5s;
+  -webkit-animation: sctool .5s;
+  -o-animation: sctool .5s;
+}
+
+/* 底部信息栏 */
+.alert-group {
+  display: flex;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
+
+.alert-item {
+  flex: 1;
+  border-radius: 0;
+  margin-bottom: 0;
+}
+
+/* 右下角提示信息 */
+.toast-outer {
+  position: absolute;
+  bottom: 4em;
+  right: 0;
+}
+
+.toast-cointer-div {
+  position: absolute;
+  bottom: 60px;
+  right: 0;
+}
+
+/* 加载层文字 */
+.hover-loading-text {
+  text-align: center;
+}
+
+#main-container {
+  margin-top: 60px;
+  overflow-y: scroll;
+}
+
+#sub-container {
+  display: inline;
+}
+
+/* 干掉滚动条 */
+#main-container::-webkit-scrollbar {
+  width: 0 !important;
+}
+
+#unit-info-header,
+#land-info-header {
+  padding: .25rem .75rem;
+}
+
+/* 数据显示区，标题图标 */
+#unit-img,
+#land-img {
+  background-image: url(../img/map_texture.png);
+  -webkit-transform: scale(.6);
+  transform: scale(.6);
+  float: left;
+  margin-right: 1em;
+  width: 48px;
+  height: 48px;
+}
+
+/* 数据显示区，标题文字 */
+#unit-title,
+#land-title {
+  padding: .75rem;
+  line-height: 16pt;
+  font-size: 16pt;
+}
+
+/* 卡片数据项 */
+.card-data-item {
+  font-size: 16pt;
+}
+
+.skills {
+  font-size: 16pt;
+  padding: 0 .5rem;
+}
+
+.card-part {
+  width: 50%;
+  float: left;
+}
+
+#main-canvas {
+  box-shadow: white 0 0 10px;
+}
+
+/* 窄屏适配 */
+@media screen and (max-width: 500px) {
+  .start-btn {
+    width: 60%;
+  }
+}
+
+@media screen and (max-width: 1000px) {
+  .card-part {
+    width: 100%;
+  }
+}

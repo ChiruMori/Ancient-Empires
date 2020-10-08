@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script type="text/javascript">
+    var c, ctx, myImage;
+
+    function displayImage() {
+      myImage = new Image();
+      myImage.src = "./img/unit.png";
+      c = document.getElementById("myCanvas");
+      if (c.getContext) {
+        ctx = c.getContext("2d");
+        myImage.onload = function () {
+          ctx.drawImage(myImage, 0, 0);
+        }
+      }
+    }
+    //colorArr 替换后的颜色
+    // 替换前的颜色
+    function getColorData(to, from) {
+      imageD = ctx.getImageData(0, 0, myImage.width, myImage.height);
+      var pdata = imageD.data;
+      for (var j = 0; j < pdata.length; j += 4) {
+        if (pdata[j] === from[0]) pdata[j] = to[0];
+        if (pdata[j + 1] === from[1]) pdata[j + 1] = to[1];
+        if (pdata[j + 2] === from[2]) pdata[j + 2] = to[2];
+      }
+      ctx.putImageData(imageD, 0, 0);
+    }
+
+    function colorChange() {
+      // rgb颜色
+      getColorData([198, 0, 14], [0, 100, 198]);
+    }
+  </script>
+  <title>变色测试</title>
+</head>
+
+<body onload="displayImage()">
+  <p>原始图片：</p>
+  <img id="myPhoto" src="./img/unit.png">
+  <p>Canvas图片：</p>
+  <canvas id="myCanvas" width="200" height="200"></canvas>
+  <button id="btn" onclick="colorChange()">变颜色啦！</button>
+</body>
+
+</html>
