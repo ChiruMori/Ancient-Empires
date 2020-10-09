@@ -18,6 +18,12 @@ cxlm.loadGame = function () {
     return 0;
   };
 
+  // 同盟
+  cxlm.team = [
+    ['blue'],
+    ['red'],
+  ]
+
   /**
    * 地图，必须
    */
@@ -54,8 +60,9 @@ cxlm.loadGame = function () {
     ],
     effect: () => {
       // 光标定位到蓝色领主
-      cxlm.clickX = 5;
-      cxlm.clickY = 5;
+      cxlm.cursorX = 5;
+      cxlm.cursorY = 5;
+      cxlm.changeInfo();
     },
   }, {
     startCondition: () => {},

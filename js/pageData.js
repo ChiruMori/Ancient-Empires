@@ -82,6 +82,7 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 1,
     cost: 400,
+    town: true, // 村庄捕获者
   },
   soldier: {
     atk: 55,
@@ -97,6 +98,7 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 1,
     cost: 150,
+    town: true, // 村庄捕获者
   },
   ghost: {
     atk: 50,
@@ -112,6 +114,7 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 1,
     cost: 200,
+    air: true, // 空军
   },
   merman: {
     atk: 40,
@@ -127,6 +130,7 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 2,
     cost: 200,
+    water: true, // 水之子
   },
   archer: {
     atk: 45,
@@ -157,6 +161,7 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 1,
     cost: 250,
+    restore: true, // 自我修复
   },
   water: {
     atk: 60,
@@ -172,6 +177,7 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 1,
     cost: 300,
+    water: true,
   },
   dark: {
     atk: 50,
@@ -187,6 +193,7 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 2,
     cost: 300,
+    blinder: true, // 致盲者
   },
   wizard: {
     atk: 45,
@@ -217,6 +224,8 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 1,
     cost: 400,
+    heal: true, // 治愈
+    town: true, // 村庄捕获者
   },
   spirit: {
     atk: 55,
@@ -232,6 +241,8 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 2,
     cost: 500,
+    air: true,
+    forest: true, // 森林之子
   },
   berserker: {
     atk: 70,
@@ -247,6 +258,8 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 1,
     cost: 500,
+    land: true, // 大地之子
+    back: true, // 反击风暴
   },
   wolf: {
     atk: 75,
@@ -262,6 +275,9 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 1,
     cost: 600,
+    land: true, // 大地之子
+    assault: true, // 突击部队
+    poisoner: true, // 投毒者
   },
   rock: {
     atk: 55,
@@ -277,6 +293,7 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 1,
     cost: 600,
+    mountain: true, // 山地之子
   },
   ice: {
     atk: 55,
@@ -292,6 +309,8 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 3,
     cost: 600,
+    water: true,
+    restore: true,
   },
   druid: {
     atk: 40,
@@ -322,6 +341,7 @@ cxlm.roleData = {
     rangeMin: 3,
     rangeMax: 5,
     cost: 800,
+    breaker: true, // 破坏者
   },
   wolfarcherr: {
     atk: 60,
@@ -337,6 +357,8 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 3,
     cost: 800,
+    blinder: true,
+    assault: true,
   },
   dragon: {
     atk: 70,
@@ -352,6 +374,10 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 2,
     cost: 1000,
+    assault: true,
+    air: true,
+    // 近战大师
+    // 远程防御
   },
   skull: {
     atk: 40,
@@ -367,6 +393,7 @@ cxlm.roleData = {
     rangeMin: 1,
     rangeMax: 1,
     cost: 0,
+    poisoner: true, // 投毒者
   },
   crystal: {
     atk: 0,
@@ -407,6 +434,8 @@ cxlm.Role = class {
     this.hpMax = 100;
     this.x = x;
     this.y = y;
+    this.exp = 0;
+    this.level = 0;
   }
 
   draw() {
@@ -802,14 +831,19 @@ cxlm.Subscriber = class {
 
   // 取消订阅，释放内存
   unsubscribe() {
-    delete allSubs[key];
+    delete cxlm.Subscriber.allSubs[this.key];
   }
 
-  // 自动控制
+  /**
+   * 自动控制事件处理、解除订阅
+   * @param {function} fn 自动控制函数，接受一个参数为消息，返回布尔类型表示是否完成处理
+   */
   async autoControl(fn) {
-    while (1) {
-      await this.acquire().then(msg => fn(msg));
+    let continueListen = true;
+    while (continueListen) {
+      await this.acquire().then(msg => continueListen = fn(msg));
     }
+    this.unsubscribe();
   }
 
 }
@@ -827,6 +861,7 @@ cxlm.ClickMessage = class {
     }
     this.x = ~~((x - cxlm.offsetX) / itemWidth);
     this.y = ~~((y - cxlm.offsetY) / itemHeight);
+    this.multiClick = (this.x === cxlm.cursorX && this.y === cxlm.cursorY); // 重复点击
   }
 }
 

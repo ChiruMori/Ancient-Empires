@@ -35,7 +35,8 @@
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <ul class="navbar-nav mr-auto">
         <li class="nav-item">
-          <a class="nav-link" href="#"><i class="fas fa-chess-rook"></i> 游戏目标</a>
+          <a class="nav-link" href="javascript:void(0);" onclick="cxlm.showToast('info', cxlm.missionTargetDesc)"><i
+              class="fas fa-chess-rook"></i> 游戏目标</a>
         </li>
         <li class="nav-item">
           <a class="nav-link" href="#"><i class="fas fa-save"></i> 保存进度</a>
@@ -44,7 +45,8 @@
           <a class="nav-link" href="#"><i class="far fa-flag"></i> 投降</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="#"><i class="fas fa-redo"></i> 结束回合</a>
+          <a class="nav-link" href="javascript:void(0);" onclick="if(confirm('结束当前回合？')) cxlm.nextTurn()"><i
+              class="fas fa-redo"></i> 结束回合</a>
         </li>
       </ul>
       <a class="navbar-brand" href="#">
@@ -75,25 +77,25 @@
             <tbody>
               <tr>
                 <td class="card-data-item"><i class="fas fa-heart text-info"></i> <span class="info-card-text"
-                    id="hp">100/150</span></td>
+                    id="unit-hp">100/150</span></td>
                 <td class="card-data-item"><i class="fas fa-angle-double-up text-info"></i> <span class="info-card-text"
-                    id="ex">100/150</span></td>
+                    id="unit-ex">100/150</span></td>
                 <td class="card-data-item"><i class="fas fa-skull text-info"></i> <span class="info-card-text"
-                    id="atk">160</span></td>
+                    id="unit-atk">160</span></td>
               </tr>
               <tr>
                 <td class="card-data-item"><i class="fas fa-shield-alt text-info"></i> <span class="info-card-text"
-                    id="def">100</span></td>
+                    id="unit-def">100</span></td>
                 <td class="card-data-item"><i class="fas fa-magic text-info"></i> <span class="info-card-text"
-                    id="buf">20</span></td>
+                    id="unit-buf">20</span></td>
                 <td class="card-data-item"><i class="fas fa-arrows-alt text-info"></i> <span class="info-card-text"
-                    id="mov">13</span></td>
+                    id="unit-mov">13</span></td>
               </tr>
             </tbody>
           </table>
           <hr />
           <div id="unit-skills" class="skills">
-            <p class="text-light">突袭者</p>
+            <p class="text-light" id="unit-hint">突袭者</p>
           </div>
         </div>
       </div>
@@ -119,7 +121,7 @@
           </table>
           <hr />
           <div id="land-skills" class="skills">
-            <p class="text-light">水面地形对于水元素十分有利，其他单元则会淹死</p>
+            <p class="text-light" id="land-hint">水面地形对于水元素十分有利，其他单元则会淹死</p>
           </div>
         </div>
       </div>
@@ -132,13 +134,13 @@
   <!-- 底部游戏数据显示区 -->
   <div id="alert-group" class="alert-group" style="display: none;">
     <div class="alert-item alert alert-primary" role="alert">
-      <i class="fas fa-coins"></i> 123456
+      <i class="fas fa-coins"></i> <span id="coin-value">123456</span>
     </div>
     <div class="alert-item alert alert-primary" role="alert">
-      <i class="fas fa-user"></i> 12 / 50
+      <i class="fas fa-user"></i> <span id="popu-value">12 / 50</span>
     </div>
     <div class="alert-item alert alert-primary" role="alert">
-      <i class="fas fa-hourglass-start"></i> 122
+      <i class="fas fa-hourglass-start"></i> <span id="turn-value">122</span>
     </div>
   </div>
   <!-- 下方剧情显示区域 -->

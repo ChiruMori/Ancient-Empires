@@ -153,7 +153,7 @@ cxlm.toggleToGame = async function (missionName) {
   await cxlm.requestMission(missionName).then(data => missionData = data);
   $('body').append($(`<script src="${missionData.url}"></script>`)); // 注入游戏脚本
   while (typeof cxlm.loadGame !== 'function') {
-    console.log('等待有效果');
+    console.log('等待脚本加载');
     await cxlm.sleep(999); // 等待脚本加载完毕
   }
   await Promise.all([cxlm.loadGame(), // 加载游戏数据
@@ -171,18 +171,196 @@ cxlm.toggleToGame = async function (missionName) {
     yellow: {},
     units: [], // 存放所有单元的二维矩阵
     population: 50,
-    turns: 0,
+    turns: -1,
     order: ['blue', 'red', 'green', 'dark', 'purple', 'yellow'],
   };
   cxlm.clickMQ = new cxlm.MessageQueue();
+  // 点击地图内合法元素
   cxlm.clickMQ.subscribe('inner', 10).autoControl(msg => {
     cxlm.cursorX = msg.x;
     cxlm.cursorY = msg.y;
+    // TODO 全局点击事件处理
+    if (!msg.multiClick) {
+      cxlm.changeInfo();
+      cxlm.clearRange();
+      let clickUnit = cxlm.groups.units[msg.y][msg.x];
+      if (clickUnit !== undefined) { // 点击了某个单位
+        let nowColor = cxlm.groups.order[cxlm.groups.turns];
+        if (clickUnit.color === nowColor) { // 点击了己方单位
+          cxlm.showReachable(false, clickUnit, clickUnit.move);
+        } else { // 点击了非己方单位
+          cxlm.showReachable(true, clickUnit, clickUnit.move);
+        }
+      }
+    }
     console.log(msg);
+    return true;
   })
   cxlm.toggleLoading('hide');
   // 开始绘制游戏画面
   cxlm.startGame();
+}
+
+cxlm.getMapEleMetaOf = function (row, col) {
+  let landKey = cxlm.map[row][col];
+  if (landKey.indexOf('castle') !== -1) landKey = 'l_castle_blue';
+  else if (landKey.indexOf('town') !== -1) landKey = 'l_town_blue';
+  return cxlm.mapParts[landKey];
+}
+
+// 判断两个单元是否互为敌方
+cxlm.enemyTo = function (unit1, unit2) {
+  if (unit1 === undefined || unit2 === undefined || unit1.color === unit2.color)
+    return false;
+  let teamIndex1, teamIndex2;
+  for (let i = 0; i < cxlm.team.length; i++) {
+    cxlm.team[i].forEach(color => {
+      if (unit1.color === color) teamIndex1 = i;
+      if (unit2.color === color) teamIndex2 = i;
+    })
+  }
+  return teamIndex1 === teamIndex2;
+}
+
+/**
+ * 显示可达区域
+ * @param {boolean} showAtk 是否同时显示可以攻击的范围
+ * @param {object} unit 单元对象，需要根据单位的技能确定范围
+ * @param {number} step 可以走的步数，因突击部队的存在，不能使用 unit.step
+ */
+cxlm.showReachable = function (showAtk, unit, step) {
+  let nowMap = [];
+  let res = [];
+  for (let i = 0; i < cxlm.mapRows; i++) {
+    let nowRow = []
+    for (let j = 0; j < cxlm.mapCols; j++) {
+      let eleMeta = cxlm.getMapEleMetaOf(i, j);
+      nowRow[j] = eleMeta.mov;
+      // 仅需一个移动点的情况
+      if ((eleMeta.type === 'water' && unit.water) || (eleMeta.type === 'land' && unit.land)) {
+        nowRow[j] = 1;
+      }
+      if (cxlm.enemyTo(unit, cxlm.groups.units[i][j])) {
+        nowRow[j] = Number.POSITIVE_INFINITY; // 不让敌方通过
+      }
+      if (unit.air) { // 飞翔的力量
+        nowRow[j] = 1;
+      }
+    }
+    nowMap[i] = nowRow;
+    res.push([]);
+  }
+  let attack = function (row, col) {
+    if (unit.isBland) {
+      res[row][col] = 2; // 打得到自己
+      return;
+    }
+    let reachIfInBound = function (r, c) {
+      if (r >= 0 && c >= 0 && r < cxlm.mapRows && c < cxlm.mapCols) { // 越界判定
+        res[row][col] = 2; // 打得到
+      }
+    }
+    for (let nowReach = unit.rangeMin; nowReach <= unit.rangeMax; nowReach++) {
+      for (let r = row - nowReach, c = col; r < row; r++, c++) reachIfInBound(r, c); // ↘
+      for (let r = row, c = col + nowReach; c > col; r++, c--) reachIfInBound(r, c); // ↙
+      for (let r = row + nowReach, c = col; r > row - nowReach; r--, c--) reachIfInBound(r, c); // ↖
+      for (let r = row, c = col - nowReach; c < col; r--, c++) reachIfInBound(r, c); // ↗
+    }
+  }
+  // 搜索（迪杰斯特拉）
+  let bfsQueue = new cxlm.PriorityQueue((a, b) => a.step - b.step);
+  bfsQueue.offer({ // 起点
+    row: unit.y,
+    col: unit.x,
+    step: 0
+  });
+  let getKey = (r, c) => r + ',' + c;
+  let startKey = getKey(unit.y, unit.x);
+  let covered = {};
+  covered[startKey] = true;
+  const dir = [
+    [-1, 0],
+    [0, 1],
+    [1, 0],
+    [0, -1]
+  ];
+  while (!bfsQueue.isEmpty()) {
+    let nowNode = bfsQueue.shift();
+    dir.forEach(nowDir => {
+      let newRow = nowNode.row + nowDir[0];
+      let newCol = nowNode.col + nowDir[1];
+      if (newRow >= cxlm.mapRows || newRow < 0 || newCol >= cxlm.mapCols || newCol < 0) return;
+      let nowMapEle = nowMap[newRow][newCol];
+      let nowKey = getKey(newRow, newCol);
+      if (nowMapEle !== Number.POSITIVE_INFINITY && !covered[nowKey] && nowNode.step + nowMapEle <= step) {
+        bfsQueue.offer({
+          row: newRow,
+          col: newCol,
+          step: nowNode + nowMapEle,
+        });
+        covered[nowKey] = true;
+      }
+    })
+    if (cxlm.groups.units[nowNode.row][nowNode.col] === undefined) { // 没有人站在上面
+      res[nowNode.row][nowNode.col] = 1; // 可达
+      if (showAtk) attack(nowNode.row, nowNode.col); // 计算可达区域
+    }
+  }
+  for (let r = 0; r < cxlm.mapRows; r++) {
+    for (let c = 0; c < cxlm.mapCols; c++) {
+      if (res[r][c] === 1) {
+        cxlm.newRangeCube(c, r, 'yellow');
+      } else if (res[r][c] === 2) {
+        cxlm.newRangeCube(c, r, 'red');
+      }
+    }
+  }
+}
+
+// 更新底部信息栏
+cxlm.changeInfo = function () {
+  let unit = cxlm.groups.units[cxlm.cursorY][cxlm.cursorX];
+  let unitMeta = {
+    x: 1000,
+    y: 1000
+  }
+  if (unit !== undefined) {
+    unitMeta = cxlm.unitParts[cxlm.groups.units[cxlm.cursorY][cxlm.cursorX].unit + '1'];
+  }
+  let land = cxlm.getMapEleMetaOf(cxlm.cursorY, cxlm.cursorX);
+  if (!unit) {
+    unit = {
+      hp: '-',
+      hpMax: '-',
+      atk: '-',
+      def: '-',
+      defAdd: '-',
+      move: '-',
+    }
+  }
+  $('#unit-hp').text(`${unit.hp}/${unit.hpMax}`);
+  if (unit.exp) {
+    $('#unit-ex').text(`${unit.exp}/${unit.level + 1}00`);
+  } else {
+    $('#unit-ex').text('-/-');
+  }
+  $('#unit-atk').text(unit.atk);
+  $('#unit-def').text(unit.def);
+  $('#unit-buf').text(unit.defAdd);
+  $('#unit-mov').text(unit.move);
+  // TODO 单元描述
+  if (unit.isLeader) {
+    $('#unit-img')[0].style.setProperty('background-image', `url(./img/leader.png)`);
+    $('#unit-img')[0].style.setProperty('background-position', `-${cxlm.leaders['leader_' + unit.color].small1.x}px -${cxlm.leaders['leader_' + unit.color].small1.y}px`);
+  } else {
+    $('#unit-img')[0].style.setProperty('background-image', `url(./img/unit.png)`);
+    $('#unit-img')[0].style.setProperty('background-position', `-${unitMeta.x}px -${unitMeta.y}px`);
+  }
+  $('#land-def').text(land.def);
+  $('#land-mov').text(land.mov);
+  $('#land-coin').text(land.coin);
+  // TODO 地形描述
+  $('#land-img')[0].style.setProperty('background-position', `-${land.x}px -${land.y}px`);
 }
 
 /**
@@ -237,7 +415,7 @@ cxlm.drawMap = function () {
   // 填充背景
   cxlm.ctx.fillStyle = 'black';
   cxlm.ctx.fillRect(0, 0, cxlm.canvasWidth, cxlm.canvasHeight);
-  // 绘制地图、
+  // 绘制地图
   let nowX, nowY = cxlm.offsetY + cxlm.dragOffsetY;
   for (let r = 0; r < cxlm.map.length; r++) {
     let row = cxlm.map[r];
@@ -305,6 +483,38 @@ cxlm.drawCursor = function () {
   cxlm.ctx.drawImage(cxlm.fragImg, cursorMeta.x, cursorMeta.y,
     cursorMeta.width, cursorMeta.height, targetX, targetY,
     cursorMeta.width * cxlm.options.scale, cursorMeta.height * cxlm.options.scale);
+}
+
+/** 绘制范围提示网格 */
+cxlm.drawRange = function () {
+  if (!cxlm.range) return;
+  cxlm.range.forEach(cube => {
+    let rect = cxlm.fragments[cube.color + '_rect'];
+    cxlm.ctx.drawImage(cxlm.fragImg, rect.x, rect.y, rect.width, rect.height,
+      cxlm.offsetX + cube.x * cxlm.options.mapMeta.itemWidth * cxlm.options.scale + ((cxlm.options.mapMeta.itemWidth - rect.width) >> 1),
+      cxlm.offsetY + cube.y * cxlm.options.mapMeta.itemHeight * cxlm.options.scale + ((cxlm.options.mapMeta.itemHeight - rect.height) >> 1),
+      rect.width * cxlm.options.scale, rect.height * cxlm.options.scale);
+  });
+}
+
+cxlm.newRangeCube = (x, y, color) => {
+  if (cxlm.range === undefined) {
+    cxlm.range = [];
+  }
+  cxlm.range.push({
+    x,
+    y,
+    color
+  });
+}
+
+cxlm.clearRange = () => delete cxlm.range;
+
+cxlm.nextTurn = function () {
+  cxlm.groups.turns++;
+  while (!cxlm.groups[cxlm.groups.order[cxlm.groups.turns]].active) {
+    cxlm.groups.turns++;
+  }
 }
 
 /**
@@ -415,11 +625,13 @@ cxlm.startGame = function () {
   })
   cxlm.clock = 0; // 绘图时钟
   // TODO: 拓展存档加载功能
+  cxlm.changeInfo();
   // 获取剧情
   if (!cxlm.storyIndex) { // 没有获取到存档，重新开始
     cxlm.storyIndex = 0; // TODO 存档时保留
     cxlm.storyShowing = false;
   }
+  $('#story-area').click(() => cxlm.clickMQ.offer(new this.ClickMessage(-1, -1))); // 点击剧情区域时，生成一个越界点击事件
   // 启动主循环
   let loop = function () {
     if (cxlm.mainLoopStarted) {
@@ -428,9 +640,25 @@ cxlm.startGame = function () {
       if (cxlm.clock >= 1024) cxlm.clock = 0;
       cxlm.drawMap();
       cxlm.drawUnits();
+      cxlm.drawRange(); // 绘制范围提示
       cxlm.drawCursor(); // 绘制光标
       if (!cxlm.storyShowing && cxlm.storyLine.length > cxlm.storyIndex && cxlm.storyLine[cxlm.storyIndex].startCondition()) {
-
+        cxlm.story('show', cxlm.storyLine[cxlm.storyIndex].text[0][0], cxlm.storyLine[cxlm.storyIndex].text[0][1]);
+        cxlm.storyShowing = true;
+        cxlm.nowStoryIndex = 1;
+        // 监听阻塞事件直到当前故事结束
+        cxlm.clickMQ.subscribe('*', 999).autoControl(() => {
+          let storyArr = cxlm.storyLine[cxlm.storyIndex].text;
+          if (cxlm.nowStoryIndex >= storyArr.length) {
+            cxlm.storyLine[cxlm.storyIndex].effect(); // 发动剧情效果
+            cxlm.story('hide');
+            cxlm.storyIndex++; //  进入下一个剧情
+            return cxlm.storyShowing = false;
+          }
+          cxlm.story('show', storyArr[cxlm.nowStoryIndex][0], storyArr[cxlm.nowStoryIndex][1])
+          cxlm.nowStoryIndex++;
+          return true;
+        });
       }
       // TODO: 绘制其他元素
     }
