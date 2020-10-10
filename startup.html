@@ -20,6 +20,8 @@
   <script src="./js/animateUtil.js"></script>
   <script src="./js/requestUtil.js"></script>
   <script src="./js/pageData.js"></script>
+  <script src="./js/menu.js"></script>
+  <script src="./js/painter.js"></script>
   <script src="./js/main.js"></script>
 </head>
 
@@ -126,6 +128,25 @@
         </div>
       </div>
     </div>
+  </div>
+  <!-- 左上角行动盘区 -->
+  <div id="actions-area" style="display: none">
+    <a href="javascript:void(0);" class="action-item d-none" onclick="cxlm.actMsg('buy')" id="act-buy"><i
+        class="fas fa-dollar-sign"></i></a>
+    <a href="javascript:void(0);" class="action-item d-none" onclick="cxlm.actMsg('occupy')" id="act-occupy"><i
+        class="fas fa-home"></i></a>
+    <a href="javascript:void(0);" class="action-item d-none" onclick="cxlm.actMsg('atk')" id="act-atk"><i
+        class="fas fa-fist-raised"></i></a>
+    <a href="javascript:void(0);" class="action-item d-none" onclick="cxlm.actMsg('call')" id="act-call"><i
+        class="fas fa-cross"></i></a>
+    <a href="javascript:void(0);" class="action-item d-none" onclick="cxlm.actMsg('stay')" id="act-stay"><i
+        class="fas fa-arrow-down"></i></a>
+    <a href="javascript:void(0);" class="action-item d-none" onclick="cxlm.actMsg('awake')" id="act-awake"><i
+        class="fas fa-star-of-david"></i></a>
+    <a href="javascript:void(0);" class="action-item d-none" onclick="cxlm.actMsg('heal')" id="act-heal"><i
+        class="fas fa-heart"></i></a>
+    <a href="javascript:void(0);" class="action-item d-none" onclick="cxlm.actMsg('cancel')" id="act-cancel"><i
+        class="fas fa-times"></i></a>
   </div>
   <!-- 右下角 toast 区域 -->
   <div id="toast-outer" aria-live="polite" aria-atomic="true" class="toast-outer">

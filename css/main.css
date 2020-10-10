@@ -170,6 +170,26 @@ body {
   padding: .5rem 1.2rem .5rem .5rem;
 }
 
+/* 左上方行动盘 */
+#actions-area {
+  position: fixed;
+  left: 0;
+  top: 60px;
+}
+
+.action-item {
+  margin-bottom: .5rem;
+  font-size: 24pt;
+  background-color: rgba(0, 0, 0, 0.8);
+  border-radius: 50% 0;
+  color: lightgrey !important;
+  margin-left: 1em;
+  display: block;
+  text-align: center;
+  height: 48px;
+  width: 48px;
+}
+
 /* 窄屏适配 */
 @media screen and (max-width: 500px) {
   .start-btn {

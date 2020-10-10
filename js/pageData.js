@@ -864,6 +864,14 @@ cxlm.ClickMessage = class {
     this.multiClick = (this.x === cxlm.cursorX && this.y === cxlm.cursorY); // 重复点击
   }
 }
+// 行动选择事件
+cxlm.ActionMessage = class {
+  constructor(act, srcUnit) {
+    this.topic = 'action';
+    this.msg = act;
+    this.srcUnit = srcUnit;
+  }
+}
 
 // 消息队列
 cxlm.MessageQueue = class {

@@ -46,6 +46,8 @@ cxlm.loadGame = function () {
     ['red_soldier', 5, 6],
     ['red_soldier', 4, 5],
     ['red_soldier', 6, 5],
+    // 测试使用
+    ['red_wolf', 1, 5],
   ]
 
   /**
