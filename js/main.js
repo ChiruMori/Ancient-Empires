@@ -59,6 +59,8 @@ cxlm.groups = { // TODO: 制作存档时保留
   order: ['blue', 'red', 'green', 'dark', 'purple', 'yellow'],
 };
 
+cxlm.getKey = (r, c) => r + ',' + c;
+
 cxlm.getMapEleMetaOf = function (row, col) {
   let landKey = cxlm.map[row][col];
   if (landKey.indexOf('castle') !== -1) landKey = 'l_castle_blue';
@@ -80,15 +82,9 @@ cxlm.enemyTo = function (unit1, unit2) {
   return teamIndex1 !== teamIndex2;
 }
 
-/**
- * 显示可达区域
- * @param {boolean} showAtk 是否同时显示可以攻击的范围
- * @param {object} unit 单元对象，需要根据单位的技能确定范围
- * @param {number} step 可以走的步数，因突击部队的存在，不能使用 unit.step
- */
-cxlm.showReachable = function (showAtk, unit, step) {
-  let nowMap = [];
-  let res = [];
+// 制作可用于图算法的矩阵
+cxlm.makeGraph = function (unit) {
+  let nowGraph = [];
   for (let i = 0; i < cxlm.mapRows; i++) {
     let nowRow = []
     for (let j = 0; j < cxlm.mapCols; j++) {
@@ -105,7 +101,21 @@ cxlm.showReachable = function (showAtk, unit, step) {
         nowRow[j] = 1;
       }
     }
-    nowMap[i] = nowRow;
+    nowGraph[i] = nowRow;
+  }
+  return nowGraph;
+}
+
+/**
+ * 显示可达区域
+ * @param {boolean} showAtk 是否同时显示可以攻击的范围
+ * @param {object} unit 单元对象，需要根据单位的技能确定范围
+ * @param {number} step 可以走的步数，因突击部队的存在，不能使用 unit.step
+ */
+cxlm.showReachable = function (showAtk, unit, step) {
+  let nowMap = cxlm.makeGraph(unit);
+  let res = [];
+  for (let i = 0; i < cxlm.mapRows; i++) {
     res.push([]);
   }
   let attack = function (row, col) {
@@ -114,7 +124,7 @@ cxlm.showReachable = function (showAtk, unit, step) {
       return;
     }
     let reachIfInBound = function (r, c) {
-      if (r >= 0 && c >= 0 && r < cxlm.mapRows && c < cxlm.mapCols && res[r][c] !== 1) { // 越界判定
+      if (r >= 0 && c >= 0 && r < cxlm.mapRows && c < cxlm.mapCols && res[r][c] === undefined) { // 越界判定
         res[r][c] = 2; // 打得到
       }
     }
@@ -130,10 +140,12 @@ cxlm.showReachable = function (showAtk, unit, step) {
   bfsQueue.offer({ // 起点
     row: unit.y,
     col: unit.x,
+    path: [
+      [unit.y, unit.x]
+    ],
     step: 0,
   });
-  let getKey = (r, c) => r + ',' + c;
-  let startKey = getKey(unit.y, unit.x);
+  let startKey = cxlm.getKey(unit.y, unit.x);
   let covered = {};
   covered[startKey] = true;
   const dir = [
@@ -149,27 +161,30 @@ cxlm.showReachable = function (showAtk, unit, step) {
       let newCol = nowNode.col + nowDir[1];
       if (newRow >= cxlm.mapRows || newRow < 0 || newCol >= cxlm.mapCols || newCol < 0) return;
       let nowMapEle = nowMap[newRow][newCol];
-      let nowKey = getKey(newRow, newCol);
+      let nowKey = cxlm.getKey(newRow, newCol);
       if (nowMapEle !== Number.POSITIVE_INFINITY && !covered[nowKey] && nowNode.step + nowMapEle <= step) {
+        let nowPath = nowNode.path.slice();
+        nowPath.push([newRow, newCol]);
         bfsQueue.offer({
           row: newRow,
           col: newCol,
           step: nowNode.step + nowMapEle,
+          path: nowPath,
         });
         covered[nowKey] = true;
       }
     })
     // 没有人站在上面，或者只有自己站在上面
     if (cxlm.groups.units[nowNode.row][nowNode.col] === undefined || cxlm.groups.units[nowNode.row][nowNode.col] === unit) {
-      res[nowNode.row][nowNode.col] = 1; // 可达
+      res[nowNode.row][nowNode.col] = nowNode.path; // 可达
       if (showAtk) attack(nowNode.row, nowNode.col); // 计算可攻击区域
     }
   }
-  res[unit.y][unit.x] = 1; // 不动
+  res[unit.y][unit.x] = [unit.y, unit.x]; // 不动
   for (let r = 0; r < cxlm.mapRows; r++) {
     for (let c = 0; c < cxlm.mapCols; c++) {
-      if (res[r][c] === 1) {
-        cxlm.newRangeCube(c, r, 'yellow');
+      if (res[r][c] !== undefined && res[r][c].constructor === Array) {
+        cxlm.newRangeCube(c, r, 'yellow', res[r][c]);
       } else if (res[r][c] === 2) {
         cxlm.newRangeCube(c, r, 'red');
       }
@@ -189,12 +204,99 @@ cxlm.nextTurn = function () {
 }
 
 // 行动盘点击事件
-cxlm.actMsg = (act) => cxlm.clickMQ.offer(new cxlm.ActionMessage(act, cxlm.actSub.unit));
+cxlm.actMsg = (act) => cxlm.clickMQ.offer(new cxlm.ActionMessage(act, cxlm.actionSub.unit));
 
 /**
  * 启动绘制逻辑
  */
 cxlm.startGame = function () {
+  // 创建点击事件消息队列
+  cxlm.clickMQ = new cxlm.MessageQueue();
+  // 行动盘点击事件
+  // TODO: 完善行动盘事件处理、释放私信订阅
+  cxlm.actionSub = cxlm.clickMQ.subscribe('action', -1, (msg) => {
+    console.debug(msg);
+    switch (msg.msg) {
+      case 'cancel':
+        msg.srcUnit.active = -1;
+        break;
+    }
+    return false;
+  });
+  // （选择行动盘时使用）死信订阅者，用于阻塞事件监听，解除后需要额外生成一个反馈消息用于丢弃
+  cxlm.deadSub = cxlm.clickMQ.subscribe('*', 5, (msg) => {
+    console.debug('丢弃消息：' + msg);
+    cxlm.clickMQ.offer({
+      topic: '*',
+      content: '反馈消息',
+    });
+    cxlm.deadSub.abortController.abort();
+  })
+  // （激活人物后选择移动范围的事件监听）人物移动
+  cxlm.canMoveSub = cxlm.clickMQ.subscribe('inner', 10, async (msg) => {
+    let clickKey = cxlm.getKey(msg.y, msg.x);
+    if (msg.multiClick) {
+      // 激活死信订阅者
+      cxlm.deadSub.abortController = new AbortController();
+      cxlm.deadSub.abortSignal = cxlm.deadSub.abortController.signal; // 中断等待信号
+      cxlm.deadSub.acquire();
+      // 等待移动动画结束
+      if (cxlm.unitPath === undefined) cxlm.unitPath = [
+        [msg.y, msg.x]
+      ];
+      let start = cxlm.unitPath[0];
+      // 并记录起点，用于在取消行动时恢复人物位置
+      let now = start;
+      let targetUnit = cxlm.groups.units[now[0]][now[1]];
+      for (let i = 1; i < cxlm.unitPath.length; i++) {
+        let next = cxlm.unitPath[i];
+        await targetUnit.moveTo(next[0] - now[0], next[1] - now[1]);
+        now = next;
+      }
+      // 清除路径
+      cxlm.clearRange();
+      // TODO: 根据 unit 当前位置决定显示哪些行动盘
+      cxlm.toggleActions('show', ['cancel']);
+      cxlm.actionSub.unit = targetUnit;
+      // 更高优先级的行动盘事件订阅
+      cxlm.actionSub.acquire();
+      return false;
+    }
+    // 点击处如果无法到达则取消行动，能到达则生成可绘制路径
+    if (cxlm.range && cxlm.range[clickKey] !== undefined) {
+      cxlm.cursorX = msg.x;
+      cxlm.cursorY = msg.y;
+      cxlm.unitPath = cxlm.range[cxlm.getKey(msg.y, msg.x)].path;
+      return true;
+    } else { // 点击了范围外的地图
+      cxlm.clickMQ.offer(msg); // 事件释放
+      cxlm.clearRange();
+      return false;
+    }
+  });
+  // 点击地图内合法元素
+  cxlm.clickMQ.subscribe('inner', 20).autoControl(msg => {
+    cxlm.cursorX = msg.x;
+    cxlm.cursorY = msg.y;
+    // TODO 全局点击事件处理
+    if (!msg.multiClick) {
+      cxlm.changeInfo();
+      cxlm.clearRange();
+      let clickUnit = cxlm.groups.units[msg.y][msg.x];
+      if (clickUnit !== undefined) { // 点击了某个单位
+        let nowColor = cxlm.groups.order[cxlm.groups.orderIndex];
+        if (clickUnit.color === nowColor) { // 点击了己方单位
+          cxlm.showReachable(false, clickUnit, clickUnit.move);
+          cxlm.canMoveSub.unit = clickUnit;
+          cxlm.canMoveSub.acquire();
+        } else { // 点击了非己方单位
+          cxlm.showReachable(true, clickUnit, clickUnit.move);
+        }
+      }
+    }
+    console.log(msg);
+    return true;
+  })
   // 地图行列数
   let mapRows = cxlm.map.length;
   let mapCols = cxlm.map[0].length;
@@ -292,6 +394,7 @@ cxlm.startGame = function () {
       if (cxlm.clock >= 1024) cxlm.clock = 0;
       cxlm.drawMap();
       cxlm.drawRange(); // 绘制范围提示
+      cxlm.drawPath();
       cxlm.drawUnits();
       cxlm.drawCursor(); // 绘制光标
       if (!cxlm.storyShowing && cxlm.storyLine.length > cxlm.storyIndex && cxlm.storyLine[cxlm.storyIndex].startCondition()) {
@@ -299,7 +402,7 @@ cxlm.startGame = function () {
         cxlm.storyShowing = true;
         cxlm.nowStoryIndex = 1;
         // 监听阻塞事件直到当前故事结束
-        cxlm.clickMQ.subscribe('*', 999).autoControl(() => {
+        cxlm.clickMQ.subscribe('*', -1).autoControl(() => {
           let storyArr = cxlm.storyLine[cxlm.storyIndex].text;
           if (cxlm.nowStoryIndex >= storyArr.length) {
             cxlm.storyLine[cxlm.storyIndex].effect(); // 发动剧情效果

@@ -416,6 +416,8 @@ cxlm.roleData = {
  * 角色类
  */
 cxlm.Role = class {
+  static stepFrame = 36; // 一步帧数
+  static frameLength = 10; // 帧长
   constructor(name, x, y) {
     let nameEles = name.split('_');
     let rawData = null;
@@ -436,6 +438,12 @@ cxlm.Role = class {
     this.y = y;
     this.exp = 0;
     this.level = 0;
+    // 0：常规，可以进行行动
+    // -1：行动结束
+    this.active = 0;
+    // 用于移动时动画
+    this.moveX = 0;
+    this.moveY = 0;
   }
 
   draw() {
@@ -450,16 +458,16 @@ cxlm.Role = class {
     if (this.isLeader) {
       let imgData = cxlm.leaders['leader_' + this.color];
       let nowKey = 'small' + nowStep;
-      offsetY = cxlm.offsetY + this.y * scaledHeight + scaledHeight - cxlm.options.leaderMeta.smallHeight * scale + cxlm.dragOffsetY;
-      offsetX = cxlm.offsetX + this.x * scaledWidth + scaledWidth - cxlm.options.leaderMeta.smallWidth * scale + cxlm.dragOffsetX;
+      offsetY = this.moveY + cxlm.offsetY + this.y * scaledHeight + scaledHeight - cxlm.options.leaderMeta.smallHeight * scale + cxlm.dragOffsetY;
+      offsetX = this.moveX + cxlm.offsetX + this.x * scaledWidth + scaledWidth - cxlm.options.leaderMeta.smallWidth * scale + cxlm.dragOffsetX;
       cxlm.ctx.drawImage(cxlm.leaderImgDom, imgData[nowKey].x, imgData[nowKey].y,
         imgData[nowKey].width, imgData[nowKey].height, offsetX, offsetY,
         imgData[nowKey].width * scale, imgData[nowKey].height * scale);
     } else {
       let imgData = cxlm.unitParts[this.unit + nowStep];
       let unitMeta = cxlm.options.unitMeta;
-      offsetX = cxlm.offsetX + this.x * scaledWidth + scaledWidth - cxlm.options.unitMeta.itemWidth * scale + cxlm.dragOffsetX;
-      offsetY = cxlm.offsetY + this.y * scaledHeight + scaledHeight - cxlm.options.unitMeta.itemHeight * scale + cxlm.dragOffsetY;
+      offsetX = this.moveX + cxlm.offsetX + this.x * scaledWidth + scaledWidth - cxlm.options.unitMeta.itemWidth * scale + cxlm.dragOffsetX;
+      offsetY = this.moveY + cxlm.offsetY + this.y * scaledHeight + scaledHeight - cxlm.options.unitMeta.itemHeight * scale + cxlm.dragOffsetY;
       if (this.color === 'blue') {
         cxlm.ctx.drawImage(cxlm.unitImg, imgData.x, imgData.y, unitMeta.itemWidth, unitMeta.itemHeight,
           offsetX, offsetY, unitMeta.itemWidth * scale, unitMeta.itemHeight * scale);
@@ -467,6 +475,28 @@ cxlm.Role = class {
         cxlm.drawColorChangedImg(cxlm.unitImg, imgData.x, imgData.y, unitMeta.itemWidth, unitMeta.itemHeight, offsetX, offsetY, this.color);
       }
     }
+  }
+
+  // 当前单元向指定方向移动（动画）
+  moveTo(rowDir, colDir) {
+    let xStep = colDir * cxlm.options.mapMeta.itemWidth * cxlm.options.scale / cxlm.Role.stepFrame;
+    let yStep = rowDir * cxlm.options.mapMeta.itemHeight * cxlm.options.scale / cxlm.Role.stepFrame;
+    let yShake = cxlm.options.unitMeta.itemHeight / 20; // y 轴抖动幅度
+    let thisUnit = this;
+    return new Promise(async res => {
+      for (let i = 0; i < cxlm.Role.stepFrame; i++) {
+        let nowShake = (i & 1) == 0 ? -yShake : yShake;
+        thisUnit.moveX += xStep;
+        thisUnit.moveY += yStep;
+        thisUnit.moveY += nowShake;
+        await cxlm.sleep(cxlm.Role.frameLength);
+      }
+      thisUnit.x += colDir;
+      thisUnit.y += rowDir;
+      thisUnit.moveX = 0;
+      thisUnit.moveY = 0;
+      res();
+    });
   }
 
 }
@@ -815,18 +845,36 @@ cxlm.initFragMetaData = function () {
 // 订阅者
 cxlm.Subscriber = class {
   static allSubs = {};
-  constructor(topic, priority, mq) {
+  constructor(topic, priority, mq, fn = null) {
     this.topic = topic;
     this.priority = priority;
     this.mq = mq;
     this.key = Symbol(topic);
+    this.fn = fn;
   }
   // 请求一条消息
-  acquire() {
+  async acquire() {
     let that = this;
-    return new Promise(function (res) {
-      that.mq.consume(that, res);
-    })
+    if (that.fn === null) {
+      return new Promise(function (res) {
+        that.mq.consume(that, res);
+      });
+    } else if (that.abortSignal) { // 有 fn 和 abortSignal
+      let continueListen = true;
+      while (continueListen) {
+        await new Promise((res, rej) => {
+          that.mq.consume(that, res);
+          that.abortSignal.addEventListener('abort', () => {
+            rej('用户中断');
+            continueListen = false;
+          })
+        }).catch(err => that.fn(err));
+      }
+    } else {
+      let continueListen = true;
+      while (continueListen)
+        await new Promise((res) => that.mq.consume(that, res)).then(msg => continueListen = that.fn(msg));
+    }
   }
 
   // 取消订阅，释放内存
@@ -890,7 +938,8 @@ cxlm.MessageQueue = class {
       let nowMsg = this.messageQueue[0];
       let targetQueue = this.blockingQueues[nowMsg.topic];
       this.messageQueue.shift(); // 清除读取的消息
-      if (nowMsg.topic !== '*' && !this.blockingQueues['*'].isEmpty() && this.blockingQueues['*'].peak().priority > targetQueue.peak().priority) {
+      if (nowMsg.topic !== '*' && !this.blockingQueues['*'].isEmpty() &&
+        this.nodeCompFunc(this.blockingQueues['*'].peak(), targetQueue.peak()) >= 0) {
         targetQueue = this.blockingQueues['*'];
       }
       if (targetQueue.length === 0) continue; // 消息积压时，直接丢弃消息，可以在这里添加其他处理方案
@@ -906,8 +955,8 @@ cxlm.MessageQueue = class {
    * @param {number} priority 当前订阅者在所属消息分类内的优先级
    * @returns {cxlm.Subscriber} 订阅者对象
    */
-  subscribe(topic, priority) {
-    let now = new cxlm.Subscriber(topic, priority, this);
+  subscribe(topic, priority, fn = null) {
+    let now = new cxlm.Subscriber(topic, priority, this, fn);
     if (!this.blockingQueues[topic]) {
       this.newType(topic);
     }

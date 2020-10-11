@@ -122,28 +122,6 @@ cxlm.toggleToGame = async function (missionName) {
     cxlm.initLeaderMetaData(), // 加载领主元数据
     cxlm.initFragMetaData(), // 加载其他必要碎片
   ]);
-  cxlm.clickMQ = new cxlm.MessageQueue();
-  // 点击地图内合法元素
-  cxlm.clickMQ.subscribe('inner', 10).autoControl(msg => {
-    cxlm.cursorX = msg.x;
-    cxlm.cursorY = msg.y;
-    // TODO 全局点击事件处理
-    if (!msg.multiClick) {
-      cxlm.changeInfo();
-      cxlm.clearRange();
-      let clickUnit = cxlm.groups.units[msg.y][msg.x];
-      if (clickUnit !== undefined) { // 点击了某个单位
-        let nowColor = cxlm.groups.order[cxlm.groups.orderIndex];
-        if (clickUnit.color === nowColor) { // 点击了己方单位
-          cxlm.showReachable(false, clickUnit, clickUnit.move);
-        } else { // 点击了非己方单位
-          cxlm.showReachable(true, clickUnit, clickUnit.move);
-        }
-      }
-    }
-    console.log(msg);
-    return true;
-  })
   cxlm.toggleLoading('hide');
   // 开始绘制游戏画面
   cxlm.startGame();

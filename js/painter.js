@@ -130,24 +130,55 @@ cxlm.drawCursor = function () {
 /** 绘制范围提示网格 */
 cxlm.drawRange = function () {
   if (!cxlm.range) return;
-  cxlm.range.forEach(cube => {
+  for (let pathKey in cxlm.range) {
+    let cube = cxlm.range[pathKey];
     let rect = cxlm.fragments[cube.color + '_rect'];
     cxlm.ctx.drawImage(cxlm.fragImg, rect.x, rect.y, rect.width, rect.height,
-      cxlm.offsetX + cxlm.dragOffsetX + cube.x * cxlm.options.mapMeta.itemWidth * cxlm.options.scale + ((cxlm.options.mapMeta.itemWidth - rect.width) >> 1),
-      cxlm.offsetY + cxlm.dragOffsetY + cube.y * cxlm.options.mapMeta.itemHeight * cxlm.options.scale + ((cxlm.options.mapMeta.itemHeight - rect.height) >> 1),
+      cxlm.offsetX + cxlm.dragOffsetX + cube.col * cxlm.options.mapMeta.itemWidth * cxlm.options.scale + ((cxlm.options.mapMeta.itemWidth - rect.width) >> 1),
+      cxlm.offsetY + cxlm.dragOffsetY + cube.row * cxlm.options.mapMeta.itemHeight * cxlm.options.scale + ((cxlm.options.mapMeta.itemHeight - rect.height) >> 1),
       rect.width * cxlm.options.scale, rect.height * cxlm.options.scale);
-  });
-}
-
-cxlm.newRangeCube = (x, y, color) => {
-  if (cxlm.range === undefined) {
-    cxlm.range = [];
   }
-  cxlm.range.push({
-    x,
-    y,
-    color
+}
+
+cxlm.newRangeCube = (col, row, color, path) => {
+  if (cxlm.range === undefined) {
+    cxlm.range = {};
+  }
+  let crKey = cxlm.getKey(row, col);
+  cxlm.range[crKey] = ({
+    col,
+    row,
+    color,
+    path,
   });
 }
 
-cxlm.clearRange = () => delete cxlm.range;
+/** 绘制移动轨迹 */
+cxlm.drawPath = function () {
+  if (cxlm.unitPath === undefined) return;
+  let len = cxlm.unitPath.length;
+  let mapEleWidth = cxlm.options.mapMeta.itemWidth * cxlm.options.scale;
+  let mapEleHeight = cxlm.options.mapMeta.itemHeight * cxlm.options.scale;
+  if (len > 0) {
+    cxlm.ctx.beginPath();
+    cxlm.ctx.moveTo((cxlm.unitPath[0][1] + 0.5) * mapEleWidth + cxlm.offsetX + cxlm.dragOffsetX,
+      (cxlm.unitPath[0][0] + 0.5) * mapEleHeight + cxlm.offsetY + cxlm.dragOffsetY);
+    for (let i = 1; i < len; i++) {
+      cxlm.ctx.lineTo((cxlm.unitPath[i][1] + 0.5) * mapEleWidth + cxlm.offsetX + cxlm.dragOffsetX,
+        (cxlm.unitPath[i][0] + 0.5) * mapEleHeight + cxlm.offsetY + cxlm.dragOffsetY);
+    }
+    cxlm.ctx.strokeStyle = "#FF0000";
+    cxlm.ctx.lineWidth = ~~(mapEleWidth * 0.2);
+    cxlm.ctx.stroke();
+  }
+  let crossMeta = cxlm.fragments.cross;
+  cxlm.ctx.drawImage(cxlm.fragImg, crossMeta.x, crossMeta.y, crossMeta.width, crossMeta.height,
+    cxlm.unitPath[len - 1][1] * mapEleWidth + cxlm.offsetX + cxlm.dragOffsetX + ((mapEleWidth - crossMeta.width * cxlm.options.scale) >> 1),
+    cxlm.unitPath[len - 1][0] * mapEleHeight + cxlm.offsetY + cxlm.dragOffsetY + ((mapEleHeight - crossMeta.height * cxlm.options.scale) >> 1),
+    crossMeta.width * cxlm.options.scale, crossMeta.width * cxlm.options.scale);
+}
+
+cxlm.clearRange = () => {
+  delete cxlm.range;
+  delete cxlm.unitPath;
+}
