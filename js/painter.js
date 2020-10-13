@@ -14,7 +14,7 @@ if (typeof window.cxlm !== 'object') {
  * @param {number} hei 原图截取高度
  * @param {number} targetX 目标坐标
  * @param {number} targetY 目标坐标
- * @param {string} targetColor 需要转换成的颜色，合法值为：red, green, dark, purple, yellow
+ * @param {string} targetColor 需要转换成的颜色，合法值为：red, green, dark, purple, yellow, bw
  */
 cxlm.drawColorChangedImg = function (img, x, y, wid, hei, targetX, targetY, targetColor) {
   if (!cxlm.vcanvas) {
@@ -36,7 +36,10 @@ cxlm.drawColorChangedImg = function (img, x, y, wid, hei, targetX, targetY, targ
   for (let i = 0; i < dat.length; i += 4) {
     for (let j = 0; j < cxlm.colorMap.blue.length; j++) {
       let rgbBlue = cxlm.colorMap.blue[j];
-      if (dat[i] === rgbBlue[0] &&
+      if (targetColor == 'bw') { // 黑白处理
+        let midVal = ~~((dat[i] + dat[i + 1] + dat[i + 2]) / 3);
+        dat[i] = dat[i + 1] = dat[i + 2] = midVal;
+      } else if (dat[i] === rgbBlue[0] &&
         dat[i + 1] === rgbBlue[1] &&
         dat[i + 2] === rgbBlue[2]) {
         dat[i] = cxlm.colorMap[targetColor][j][0];
@@ -114,8 +117,9 @@ cxlm.drawUnits = function () {
 
 /** 绘制光标 */
 cxlm.drawCursor = function () {
-  let step = ((cxlm.clock / 30) & 1) + 1;
-  let cursorMeta = cxlm.fragments['cube' + step];
+  let circleCursor = cxlm.cursorType === 'circle';
+  let step = circleCursor ? (~~(cxlm.clock / 30) % 3) + 1 : ((cxlm.clock / 30) & 1) + 1;
+  let cursorMeta = circleCursor ? cxlm.fragments['circle' + step] : cxlm.fragments['cube' + step];
   let mapItemWid = cxlm.options.mapMeta.itemWidth * cxlm.options.scale;
   let mapItemHei = cxlm.options.mapMeta.itemHeight * cxlm.options.scale;
   let targetX = cxlm.offsetX + cxlm.cursorX * mapItemWid + cxlm.dragOffsetX;
@@ -181,4 +185,17 @@ cxlm.drawPath = function () {
 cxlm.clearRange = () => {
   delete cxlm.range;
   delete cxlm.unitPath;
+}
+
+// 在单元上绘制血量
+cxlm.drawHp = unit => {
+  cxlm.ctx.fillStyle = 'white';
+  let fontSize = ~~(cxlm.options.mapMeta.itemHeight * cxlm.options.scale / 2);
+  cxlm.ctx.font = fontSize + 'px SimHei';
+  cxlm.ctx.strokeStyle = 'black';
+  cxlm.ctx.lineWidth = 1;
+  let targetX = cxlm.offsetX + cxlm.dragOffsetX + ~~((unit.x + 0.5) * cxlm.options.scale * cxlm.options.mapMeta.itemWidth);
+  let targetY = cxlm.offsetY + cxlm.dragOffsetY + ~~((unit.y + 1) * cxlm.options.scale * cxlm.options.mapMeta.itemHeight);
+  cxlm.ctx.fillText(unit.hp, targetX, targetY);
+  cxlm.ctx.strokeText(unit.hp, targetX, targetY);
 }

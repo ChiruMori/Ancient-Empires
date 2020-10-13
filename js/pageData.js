@@ -416,7 +416,7 @@ cxlm.roleData = {
  * 角色类
  */
 cxlm.Role = class {
-  static stepFrame = 36; // 一步帧数
+  static stepFrame = 18; // 一步帧数
   static frameLength = 10; // 帧长
   constructor(name, x, y) {
     let nameEles = name.split('_');
@@ -438,14 +438,15 @@ cxlm.Role = class {
     this.y = y;
     this.exp = 0;
     this.level = 0;
-    // 0：常规，可以进行行动
-    // -1：行动结束
-    this.active = 0;
+    // true：常规，可以进行行动
+    // false：行动结束
+    this.active = true;
     // 用于移动时动画
     this.moveX = 0;
     this.moveY = 0;
   }
 
+  // TODO: 人物状态
   draw() {
     if (this.x < 0) return;
     let scale = cxlm.options.scale;
@@ -454,27 +455,53 @@ cxlm.Role = class {
     let offsetX, offsetY;
     if (offsetX < 0 || offsetX > cxlm.canvasWidth + scaledWidth || offsetY < 0 || offsetY > cxlm.canvasHeight + scaledHeight) return; // 越界
     // 绘制
-    let nowStep = ((cxlm.clock / 30) & 1) + 1;
+    let nowStep = this.active ? ((cxlm.clock / 30) & 1) + 1 : 1;
     if (this.isLeader) {
       let imgData = cxlm.leaders['leader_' + this.color];
       let nowKey = 'small' + nowStep;
       offsetY = this.moveY + cxlm.offsetY + this.y * scaledHeight + scaledHeight - cxlm.options.leaderMeta.smallHeight * scale + cxlm.dragOffsetY;
       offsetX = this.moveX + cxlm.offsetX + this.x * scaledWidth + scaledWidth - cxlm.options.leaderMeta.smallWidth * scale + cxlm.dragOffsetX;
-      cxlm.ctx.drawImage(cxlm.leaderImgDom, imgData[nowKey].x, imgData[nowKey].y,
-        imgData[nowKey].width, imgData[nowKey].height, offsetX, offsetY,
-        imgData[nowKey].width * scale, imgData[nowKey].height * scale);
+      if (this.active)
+        cxlm.ctx.drawImage(cxlm.leaderImgDom, imgData[nowKey].x, imgData[nowKey].y,
+          imgData[nowKey].width, imgData[nowKey].height, offsetX, offsetY,
+          imgData[nowKey].width * scale, imgData[nowKey].height * scale);
+      else
+        cxlm.drawColorChangedImg(cxlm.leaderImgDom, imgData[nowKey].x, imgData[nowKey].y,
+          imgData[nowKey].width, imgData[nowKey].height, offsetX, offsetY, 'bw');
     } else {
       let imgData = cxlm.unitParts[this.unit + nowStep];
       let unitMeta = cxlm.options.unitMeta;
       offsetX = this.moveX + cxlm.offsetX + this.x * scaledWidth + scaledWidth - cxlm.options.unitMeta.itemWidth * scale + cxlm.dragOffsetX;
       offsetY = this.moveY + cxlm.offsetY + this.y * scaledHeight + scaledHeight - cxlm.options.unitMeta.itemHeight * scale + cxlm.dragOffsetY;
-      if (this.color === 'blue') {
+      if (this.color === 'blue' && this.active) {
         cxlm.ctx.drawImage(cxlm.unitImg, imgData.x, imgData.y, unitMeta.itemWidth, unitMeta.itemHeight,
           offsetX, offsetY, unitMeta.itemWidth * scale, unitMeta.itemHeight * scale);
       } else {
-        cxlm.drawColorChangedImg(cxlm.unitImg, imgData.x, imgData.y, unitMeta.itemWidth, unitMeta.itemHeight, offsetX, offsetY, this.color);
+        cxlm.drawColorChangedImg(cxlm.unitImg, imgData.x, imgData.y, unitMeta.itemWidth, unitMeta.itemHeight, offsetX, offsetY, this.active ? this.color : 'bw');
       }
     }
+    if (this.hp !== this.hpMax) {
+      cxlm.drawHp(this);
+    }
+  }
+
+  // TODO: 攻击动画（数字显示）
+  attack(other, back) {
+    let damage = this.atk - other.def; // 普通防御
+    if (this.magic === other.magic) damage -= other.defAdd; // 防御加成
+    damage -= cxlm.mapParts[cxlm.map[other.y][other.x]].def; // 地形防御
+    damage = ~~(damage * this.hp / this.hpMax);
+    other.hp -= damage;
+    // TODO: 单位特殊效果，如伤害削减、远程防护、反击风暴、地形加成等，死亡判定与处理等
+    let distance = Math.abs(other.x - this.x) + Math.abs(other.y - this.y);
+    if (back && distance === 1) {
+      other.attack(this, false);
+    }
+  }
+
+  actionEnd() {
+    this.active = false;
+    delete cxlm.range;
   }
 
   // 当前单元向指定方向移动（动画）
@@ -873,7 +900,9 @@ cxlm.Subscriber = class {
     } else {
       let continueListen = true;
       while (continueListen)
-        await new Promise((res) => that.mq.consume(that, res)).then(msg => continueListen = that.fn(msg));
+        await new Promise((res) => that.mq.consume(that, res)).then(async msg => {
+          await (that.fn(msg)).then(con => continueListen = con);
+        });
     }
   }
 
