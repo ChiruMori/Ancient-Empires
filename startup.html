@@ -82,7 +82,7 @@
                     id="unit-hp">100/150</span></td>
                 <td class="card-data-item"><i class="fas fa-angle-double-up text-info"></i> <span class="info-card-text"
                     id="unit-ex">100/150</span></td>
-                <td class="card-data-item"><i class="fas fa-skull text-info"></i> <span class="info-card-text"
+                <td class="card-data-item"><i class="fas fa-fist-raised text-info"></i> <span class="info-card-text"
                     id="unit-atk">160</span></td>
               </tr>
               <tr>
@@ -171,7 +171,52 @@
   </div>
   <!-- 背景图 -->
   <div id="bg-img"></div>
-
+  <!-- 招募选项（模态弹窗） -->
+  <div class="modal fade" id="recruitModal" data-backdrop="static" data-keyboard="false" tabindex="-1" role="dialog"
+    aria-labelledby="staticBackdropLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalTitle">招募军队</h5>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="container-fluid">
+            <div class="row d-flex mb-2">
+              <div id="modalUnitName">单位名称</div>
+              <div class="unit-title"><i class="fas fa-coins"></i> <span id="modalUnitCoin">150</span></div>
+              <div class="unit-title"><i class="fas fa-bullseye"></i> <span id="modalUnitRange">2-3</span></div>
+              <div class="unit-title"><i class="fas fa-user"></i> <span id="modalUnitPopulation">1</span></div>
+            </div>
+            <div class="row d-flex mb-2">
+              <div class="col-md ml-auto u-fun"><i class="fas fa-fist-raised"></i> <span class="info-card-text"
+                  id="modalUnitAtk">160</span></div>
+              <div class="col-md ml-auto u-fun"><i class="fas fa-magic"></i> <span class="info-card-text"
+                  id="modalUnitDefAdd">20</span></div>
+              <div class="col-md ml-auto u-fun"><i class="fas fa-shield-alt"></i> <span class="info-card-text"
+                  id="modalUnitDef">0</span></div>
+              <div class="col-md ml-auto u-fun"><i class="fas fa-arrows-alt"></i> <span class="info-card-text"
+                  id="modalUnitMov">13</span></div>
+            </div>
+            <div class="row mb-2 modal-unit-info">
+              <p>这个单位是个傻屌，一旦招募了，多半要输</p>
+            </div>
+            <div class="row row-cols-5" style="overflow-x: scroll;">
+              <div id="modalUnits">
+                <!-- 单位状态 : <div class="col"><div class="modalUnitItem"></div></div> -->
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary">招募</button>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>

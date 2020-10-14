@@ -190,6 +190,51 @@ body {
   width: 48px;
 }
 
+/* 招募用模态弹窗 */
+#modalUnitName {
+  flex: 4;
+  float: left;
+  padding-left: 15px;
+}
+
+.unit-title {
+  float: right;
+  flex: 1;
+  padding-left: 5px;
+}
+
+.u-fun {
+  float: left;
+  flex: 1;
+}
+
+#modalUnits {
+  width: max-content;
+  display: flex;
+}
+
+.modal-unit-info {
+  min-height: 150px;
+  padding: 0 15px;
+}
+
+.modalUnitItem {
+  background-image: url(../img/unit.png);
+  -webkit-transform: scale(1);
+  transform: scale(1);
+  float: left;
+  margin-right: 1em;
+  width: 48px;
+  height: 48px;
+  background-repeat: no-repeat;
+  margin: 0;
+}
+
+.modalUnitItem:active,
+.modalUnitItem:hover {
+  background-color: gainsboro;
+}
+
 /* 窄屏适配 */
 @media screen and (max-width: 500px) {
   .start-btn {

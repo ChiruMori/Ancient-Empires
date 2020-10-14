@@ -122,6 +122,8 @@ cxlm.toggleToGame = async function (missionName) {
     cxlm.initLeaderMetaData(), // 加载领主元数据
     cxlm.initFragMetaData(), // 加载其他必要碎片
   ]);
+
+  cxlm.initModalMenu(); // 初始化招募菜单
   cxlm.toggleLoading('hide');
   // 开始绘制游戏画面
   cxlm.startGame();
@@ -215,4 +217,26 @@ cxlm.toggleActions = function (mode, actions) {
     cxlm.actionShowing = false;
     cxlm.domAnimateWithLib('actions-area', ['animate__fadeOutLeft'], -1).then(() => $('.action-item').addClass('d-none'));
   }
+}
+
+/**
+ * 初始化招募菜单
+ * TODO: 根据当前状态（人口上限、金币是否充足等）设置单元是否可以招募
+ * TODO: 绑定点击监听（点击招募后向事件中心发送消息）
+ * TODO: 弹窗切换（toggle），参考代码：$('#recruitModal').modal('show')
+ */
+cxlm.initModalMenu = function () {
+  let btnContainer = $('#modalUnits');
+  btnContainer.html('');
+  const listUnits = [
+    'soldier', 'ghost', 'merman', 'archer', 'slime',
+    'water', 'dark', 'wizard', 'paladin', 'spirit',
+    'berserker', 'wolf', 'rock', 'ice', 'druid',
+    'catapult', 'wolfarcher', 'dragon', 'skull'
+  ];
+  listUnits.forEach(unitName => {
+    let unitMeta = cxlm.unitParts[unitName + '1'];
+    let HTML = `<div class="col"><div class="modalUnitItem" style="background-position: -${unitMeta.x}px -${unitMeta.y}px"></div></div>`;
+    btnContainer.append($(HTML));
+  })
 }
